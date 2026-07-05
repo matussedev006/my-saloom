@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { supabase } from '../supabaseClient';
-import { User, Scissors, Phone, MapPin, Mail, Lock, ArrowLeft, Sparkles, Loader2 } from 'lucide-react';
+import { User, Scissors, Phone, MapPin, Mail, Lock, ArrowLeft, Loader2 } from 'lucide-react';
 
 interface AuthProps {
   onBack: () => void;

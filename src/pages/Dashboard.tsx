@@ -4,9 +4,7 @@ import { Settings } from './Settings';
 import { Payments } from './Payments';
 import { useSubscription } from '../hooks/useSubscription';
 import { 
-  CheckCircle2, 
-  XCircle, 
-  Clock, 
+
   Plus, 
   LayoutDashboard, 
   Sliders, 

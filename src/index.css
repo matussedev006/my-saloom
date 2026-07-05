@@ -1,0 +1,21 @@
+@import "tailwindcss";
+
+@theme {
+  /* Cores customizadas e humanizadas para o ecossistema de salões */
+  --color-saloom-50: #fdf4f5;
+  --color-saloom-100: #fbe8eb;
+  --color-saloom-500: #ec4899; /* Rosa vibrante para botões principais */
+  --color-saloom-600: #db2777;
+  --color-saloom-900: #4c1d95; /* Roxo profundo para contrastes elegantes */
+}
+
+/* Configuração do Modo Escuro baseado na classe .dark no HTML */
+@variant dark (&:where(.dark, .dark *));
+
+body {
+  @apply bg-slate-50 text-slate-900 transition-colors duration-200;
+}
+
+.dark body {
+  @apply bg-slate-950 text-slate-50;
+}

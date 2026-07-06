@@ -29,7 +29,7 @@ export function Search({ onBack }: SearchProps) {
 
   // Tenta isto temporariamente para validar:
   const fetchQueue = async (salonId: string) => {
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from("bookings") // Garante que usas a mesma tabela 'bookings'
       .select("*")
       .eq("salon_id", salonId)

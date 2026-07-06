@@ -23,32 +23,40 @@ export function Dashboard({ salonId, onLogout }: DashboardProps) {
     "dashboard",
   );
   const [bookings, setBookings] = useState<Booking[]>([]);
+  const [totalEstimatedTime, setTotalEstimatedTime] = useState(0);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newBooking, setNewBooking] = useState({ name: "", service: "" });
 
   const { isAccessAllowed, loading: loadingSubscription } =
     useSubscription(salonId);
 
-  // Deve ficar assim para o trabalhador ver tudo do salão:
-  // Na Dashboard.tsx, a função fetchBookings deve ser:
   const fetchBookings = async () => {
     const { data } = await supabase
-      .from("bookings") // Garante que é a mesma tabela onde o cliente insere
+      .from("bookings")
       .select("*")
       .eq("salon_id", salonId)
-      // NUNCA filtres por user_id aqui, senão o trabalhador só vê o que ele mesmo criou
       .order("created_at", { ascending: true });
-    setBookings(data || []);
+
+    if (data) {
+      setBookings(data);
+      // Calcula o tempo inicial apenas dos clientes em espera
+      const total = data
+        .filter((b) => b.status === "waiting" && b.estimated_time)
+        .reduce((acc, curr) => acc + parseInt(curr.estimated_time || "0"), 0);
+      setTotalEstimatedTime(total);
+    }
   };
 
   useEffect(() => {
-    // Exemplo de lógica para buscar o nome do salão
-
     if (!isAccessAllowed) return;
     fetchBookings();
   }, [salonId, isAccessAllowed]);
 
-  const handleUpdateStatus = async (id: string, currentStatus: string) => {
+  const handleUpdateStatus = async (
+    id: string,
+    currentStatus: string,
+    time: string | null,
+  ) => {
     const newStatus = currentStatus === "waiting" ? "completed" : "waiting";
     const { error } = await supabase
       .from("bookings")
@@ -56,13 +64,19 @@ export function Dashboard({ salonId, onLogout }: DashboardProps) {
       .eq("id", id);
 
     if (!error) {
+      // Atualiza a lista local
       setBookings(
         bookings.map((b) => (b.id === id ? { ...b, status: newStatus } : b)),
+      );
+
+      // Atualiza o tempo total da bicha dinamicamente
+      const timeValue = parseInt(time || "0");
+      setTotalEstimatedTime((prev) =>
+        newStatus === "completed" ? prev - timeValue : prev + timeValue,
       );
     }
   };
 
-  // Função para o trabalhador atualizar o tempo manualmente
   const handleUpdateEstimatedTime = async (id: string, time: string) => {
     const { error } = await supabase
       .from("bookings")
@@ -70,20 +84,19 @@ export function Dashboard({ salonId, onLogout }: DashboardProps) {
       .eq("id", id);
 
     if (!error) {
-      fetchBookings();
+      fetchBookings(); // Recarrega para recalcular o tempo total
     } else {
       alert("Erro ao definir tempo: " + error.message);
     }
   };
 
   const saveManualBooking = async () => {
-    // REMOVIDO o estimated_time do insert para evitar erro de sintaxe
     const { error } = await supabase.from("bookings").insert([
       {
         salon_id: salonId,
         customer_name: newBooking.name,
         service_type: newBooking.service,
-        status: "pending",
+        status: "waiting",
         booking_date: new Date().toISOString().split("T")[0],
       },
     ]);
@@ -97,7 +110,7 @@ export function Dashboard({ salonId, onLogout }: DashboardProps) {
     }
   };
 
-  if (loadingSubscription) return <div>A carregar...</div>;
+  if (loadingSubscription) return <div>@mysaloom</div>;
 
   return (
     <div className="min-h-screen bg-slate-950 text-white flex">
@@ -122,17 +135,30 @@ export function Dashboard({ salonId, onLogout }: DashboardProps) {
       <main className="flex-1 p-6">
         {activeTab === "dashboard" && (
           <div>
-            <button
-              onClick={() => setIsModalOpen(true)}
-              className="bg-saloom-500 p-3 rounded-xl font-bold"
-            >
-              + Novo Agendamento
-            </button>
-            <div className="mt-6 space-y-3">
+            <div className="flex justify-between items-center mb-6">
+              <button
+                onClick={() => setIsModalOpen(true)}
+                className="bg-saloom-500 p-3 rounded-xl font-bold"
+              >
+                + Novo Agendamento
+              </button>
+
+              {/* Contador de tempo da bicha */}
+              <div className="bg-slate-900 p-3 rounded-xl border border-slate-800 text-right">
+                <p className="text-[10px] text-slate-400 uppercase font-bold">
+                  Tempo total na bicha
+                </p>
+                <p className="text-xl font-black text-saloom-500">
+                  {totalEstimatedTime} min
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-3">
               {bookings.map((b) => (
                 <div
                   key={b.id}
-                  className="p-4 border border-slate-800 rounded-xl bg-slate-900/50"
+                  className={`p-4 border rounded-xl ${b.status === "completed" ? "border-slate-800 bg-slate-900/20" : "border-slate-800 bg-slate-900/50"}`}
                 >
                   <div className="flex justify-between items-center">
                     <h4
@@ -141,8 +167,10 @@ export function Dashboard({ salonId, onLogout }: DashboardProps) {
                       {b.customer_name}
                     </h4>
                     <button
-                      onClick={() => handleUpdateStatus(b.id, b.status)}
-                      className={`text-xs px-3 py-1.5 rounded-lg font-bold ${b.status === "completed" ? "bg-slate-700" : "bg-emerald-600"}`}
+                      onClick={() =>
+                        handleUpdateStatus(b.id, b.status, b.estimated_time)
+                      }
+                      className={`text-xs px-3 py-1.5 rounded-lg font-bold ${b.status === "completed" ? "bg-slate-700 text-slate-300" : "bg-emerald-600 text-white"}`}
                     >
                       {b.status === "completed" ? "Desfazer" : "✓ Feito"}
                     </button>
@@ -151,11 +179,10 @@ export function Dashboard({ salonId, onLogout }: DashboardProps) {
                     {b.service_type}
                   </p>
 
-                  {/* Área para o trabalhador definir o tempo */}
                   {!b.estimated_time ? (
                     <input
                       type="text"
-                      placeholder="Definir tempo (ex: 45 min)"
+                      placeholder="Tempo (min)"
                       className="bg-slate-800 text-white text-xs p-1 rounded w-full border border-slate-700"
                       onBlur={(e) =>
                         handleUpdateEstimatedTime(b.id, e.target.value)
@@ -163,7 +190,7 @@ export function Dashboard({ salonId, onLogout }: DashboardProps) {
                     />
                   ) : (
                     <p className="text-xs text-saloom-500 font-bold">
-                      Tempo estimado: {b.estimated_time}
+                      Tempo estimado: {b.estimated_time} min
                     </p>
                   )}
                 </div>
@@ -179,7 +206,7 @@ export function Dashboard({ salonId, onLogout }: DashboardProps) {
           <div className="bg-slate-900 p-6 rounded-2xl w-80">
             <h2 className="mb-4 font-bold">Novo Agendamento</h2>
             <input
-              placeholder="Nome do Cliente"
+              placeholder="Nome"
               className="w-full bg-slate-800 p-2 mb-2 rounded"
               onChange={(e) =>
                 setNewBooking({ ...newBooking, name: e.target.value })
@@ -197,12 +224,6 @@ export function Dashboard({ salonId, onLogout }: DashboardProps) {
               className="w-full bg-saloom-500 py-2 rounded font-bold"
             >
               Confirmar
-            </button>
-            <button
-              onClick={() => setIsModalOpen(false)}
-              className="w-full mt-2 text-slate-400 text-sm"
-            >
-              Cancelar
             </button>
           </div>
         </div>

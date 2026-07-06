@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { Search } from "./pages/Search";
+// Remove as chavetas { }
+import {Search} from "./pages/Search";
 import { Auth } from "./pages/Auth";
 import { Dashboard } from "./pages/Dashboard";
 import { Scissors, Sun, Moon } from "lucide-react";

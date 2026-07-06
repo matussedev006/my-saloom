@@ -7,12 +7,14 @@ export function PublicQueue({ salonId }: { salonId: string }) {
   useEffect(() => {
     const fetchTodayBookings = async () => {
       const today = new Date().toISOString().split("T")[0];
+
       const { data } = await supabase
         .from("bookings")
         .select("*")
         .eq("salon_id", salonId)
         .eq("booking_date", today)
-        .order("created_at", { ascending: true }); // Quem chegou primeiro fica no topo
+        .eq("status", "waiting") // <--- Isto garante que apenas quem está na bicha aparece
+        .order("created_at", { ascending: true });
       setBookings(data || []);
     };
     fetchTodayBookings();
@@ -34,11 +36,7 @@ export function PublicQueue({ salonId }: { salonId: string }) {
               <span className="font-bold">{b.customer_name}</span>
               <p className="text-xs text-slate-400">{b.service_type}</p>
             </div>
-            {b.status === "completed" && (
-              <span className="text-emerald-500 text-xs font-bold">
-                Atendido
-              </span>
-            )}
+            {/* O "Atendido" deixa de ser necessário porque eles nem aparecem na lista */}
           </div>
         ))}
       </div>

@@ -33,7 +33,8 @@ export function Search({ onBack }: SearchProps) {
       .from("bookings") // Garante que usas a mesma tabela 'bookings'
       .select("*")
       .eq("salon_id", salonId)
-      // .gte("created_at", ...) // COMENTA ESTA LINHA E VÊ SE APARECE
+      .eq("salon_id", salonId)
+      .eq("status", "waiting") // <--- Este é o filtro crítico que precisas
       .order("created_at", { ascending: true });
 
     console.log("Dados recebidos:", data); // Abre o console (F12) e vê se os nomes estão aqui
@@ -192,8 +193,7 @@ export function Search({ onBack }: SearchProps) {
                   key={item.id}
                   className="text-slate-200 border-b border-slate-800 pb-2"
                 >
-                  {i + 1}.{" "}
-                  {item.customer_name || item.customer_name || "Sem nome"}
+                  {i + 1}. {item._name || item.customer_name || "Sem nome"}
                 </li>
               ))}
             </ul>

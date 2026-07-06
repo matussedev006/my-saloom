@@ -9,7 +9,6 @@ interface SearchProps {
 export function Search({ onBack }: SearchProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [salons, setSalons] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
   const [bookingId, setBookingId] = useState<string | null>(null);
   const [viewingQueue, setViewingQueue] = useState<string | null>(null);
   const [queueList, setQueueList] = useState<any[]>([]);
@@ -17,7 +16,6 @@ export function Search({ onBack }: SearchProps) {
   const [serviceType, setServiceType] = useState("");
 
   const fetchSalons = async (query: string) => {
-    setLoading(true);
     let queryBuilder = supabase.from("salons").select("*");
     if (query) {
       queryBuilder = queryBuilder.or(
@@ -27,7 +25,6 @@ export function Search({ onBack }: SearchProps) {
     const { data, error } = await queryBuilder.limit(6);
     if (error) console.error("Erro:", error);
     else setSalons(data || []);
-    setLoading(false);
   };
 
   // Tenta isto temporariamente para validar:

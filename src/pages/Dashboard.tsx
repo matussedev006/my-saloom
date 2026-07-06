@@ -23,10 +23,8 @@ export function Dashboard({ salonId, onLogout }: DashboardProps) {
     "dashboard",
   );
   const [bookings, setBookings] = useState<Booking[]>([]);
-  const [loadingBookings, setLoadingBookings] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newBooking, setNewBooking] = useState({ name: "", service: "" });
-  const [salonName, setSalonName] = useState("Carregando..."); // Valor padrão
 
   const { isAccessAllowed, loading: loadingSubscription } =
     useSubscription(salonId);
@@ -41,20 +39,11 @@ export function Dashboard({ salonId, onLogout }: DashboardProps) {
       // NUNCA filtres por user_id aqui, senão o trabalhador só vê o que ele mesmo criou
       .order("created_at", { ascending: true });
     setBookings(data || []);
-    setLoadingBookings(false);
   };
 
   useEffect(() => {
     // Exemplo de lógica para buscar o nome do salão
-const fetchSalonName = async () => {
-  const { data } = await supabase
-    .from("salons")
-    .select("salon_name")
-    .eq("owner_id", "user_id") // Usa o ID do utilizador logado
-    .single();
-    
-  if (data) setSalonName(data.salon_name);
-};
+
     if (!isAccessAllowed) return;
     fetchBookings();
   }, [salonId, isAccessAllowed]);
@@ -113,7 +102,6 @@ const fetchSalonName = async () => {
   return (
     <div className="min-h-screen bg-slate-950 text-white flex">
       <aside className="w-64 border-r border-slate-800 p-6">
-<h1 className="text-xl font-bold mb-8 text-saloom-500">{salonName}</h1>
         <button
           onClick={() => setActiveTab("dashboard")}
           className="block w-full text-left p-2 hover:bg-slate-900 rounded"

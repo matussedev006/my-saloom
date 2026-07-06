@@ -1,98 +1,211 @@
-import { useState } from 'react';
-import { Search as SearchIcon, MapPin, User, Scissors, Sparkles, ArrowLeft } from 'lucide-react';
+import { useState, useEffect } from "react";
+import {
+  Search as SearchIcon,
+  MapPin,
+  User,
+  Sparkles,
+  ArrowLeft,
+} from "lucide-react";
+import { supabase } from "../supabaseClient";
 
 interface SearchProps {
   onBack: () => void;
 }
 
 export function Search({ onBack }: SearchProps) {
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState("");
+  const [salons, setSalons] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [bookingId, setBookingId] = useState<string | null>(null);
+  const [viewingQueue, setViewingQueue] = useState<string | null>(null);
+  const [queueList, setQueueList] = useState<any[]>([]);
+  const [clientName, setClientName] = useState("");
+  const [serviceType, setServiceType] = useState("");
 
-  // Dados fictícios para os salões mais pesquisados (recomendações iniciais)
-  const recomendados = [
-    { id: '1', salon_name: 'Salão Estilo & Corte', owner_name: 'Mateus Matusse', location: 'Bairro de Muhalaze, Paragem cajueiro', salon_type: 'unissexo' },
-    { id: '2', salon_name: 'Nail Designer Deluxe', owner_name: 'Anabela Juvêncio', location: 'Fomento, Próximo à Escola', salon_type: 'unhas' },
-    { id: '3', salon_name: 'Barbearia do Bairro', owner_name: 'Danilo Santos', location: 'Zimpeto, Terminal do Chapapa', salon_type: 'corte' },
-  ];
+  const fetchSalons = async (query: string) => {
+    setLoading(true);
+    let queryBuilder = supabase.from("salons").select("*");
+    if (query) {
+      queryBuilder = queryBuilder.or(
+        `salon_name.ilike.%${query}%,owner_name.ilike.%${query}%,location.ilike.%${query}%`,
+      );
+    }
+    const { data, error } = await queryBuilder.limit(6);
+    if (error) console.error("Erro:", error);
+    else setSalons(data || []);
+    setLoading(false);
+  };
 
+  const fetchQueue = async (salonId: string) => {
+    const today = new Date().toISOString().split("T")[0];
+    const { data } = await supabase
+      .from("queue")
+      .select("*")
+      .eq("salon_id", salonId)
+      .gte("created_at", `${today}T00:00:00`);
+
+    setQueueList(data || []);
+    setViewingQueue(salonId);
+  };
+
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(() => fetchSalons(searchQuery), 300);
+    return () => clearTimeout(delayDebounceFn);
+  }, [searchQuery]);
+
+  const confirmBooking = async () => {
+    // Validação básica
+    if (!clientName || !serviceType || !bookingId) {
+      alert("Por favor, preencha o nome e o serviço.");
+      return;
+    }
+
+    // AQUI É O CÓDIGO QUE PRECISAS
+    // Estamos a preparar o objeto exatamente como a tua tabela 'queue' espera:
+    const newBooking = {
+      salon_id: bookingId,
+      client_name: clientName,
+      service_type: serviceType,
+      status: "waiting",
+      // O 'created_at' o Supabase trata automaticamente se definiste na tabela
+    };
+
+    // Agora enviamos para a base de dados
+    const { error } = await supabase.from("queue").insert([newBooking]);
+
+    if (error) {
+      console.error("Erro Supabase:", error);
+      alert("Erro ao marcar bicha: " + error.message);
+    } else {
+      alert("Bicha marcada com sucesso!");
+      setBookingId(null);
+      setClientName("");
+      setServiceType("");
+    }
+  };
+  
   return (
     <div className="max-w-4xl mx-auto px-4 py-8 animate-fade-in">
-      {/* Botão Voltar */}
-      <button 
+      <button
         onClick={onBack}
-        className="flex items-center gap-2 text-slate-500 hover:text-saloom-500 transition-colors mb-6 cursor-pointer"
+        className="flex items-center gap-2 text-slate-500 hover:text-saloom-500 mb-6 cursor-pointer"
       >
-        <ArrowLeft size={20} />
-        <span>Voltar ao início</span>
+        <ArrowLeft size={20} /> <span>Voltar ao início</span>
       </button>
 
-      {/* Cabeçalho */}
       <div className="text-center mb-10">
-        <h1 className="text-3xl font-extrabold tracking-tight md:text-4xl text-slate-900 dark:text-white">
+        <h1 className="text-3xl font-extrabold text-white">
           Encontre o seu <span className="text-saloom-500">Salão Favorito</span>
         </h1>
-        <p className="mt-3 text-slate-600 dark:text-slate-400 max-w-xl mx-auto">
-          Pesquise pelo nome do salão, proprietário ou localização para marcar a sua bicha hoje mesmo.
-        </p>
       </div>
 
-      {/* Barra de Pesquisa */}
       <div className="relative max-w-2xl mx-auto mb-12">
-        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400">
-          <SearchIcon size={22} />
-        </div>
+        <SearchIcon
+          className="absolute left-4 top-4 text-slate-400"
+          size={22}
+        />
         <input
           type="text"
-          placeholder="Ex: Salão Estilo, Mateus, Muhalaze..."
+          placeholder="Ex: Salão Estilo, Mateus..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="block w-full pl-12 pr-4 py-4 border border-slate-200 dark:border-slate-800 rounded-2xl bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm focus:outline-none focus:ring-2 focus:ring-saloom-500 focus:border-transparent transition-all text-lg"
+          className="w-full pl-12 pr-4 py-4 border border-slate-700 rounded-2xl bg-slate-900 text-white focus:ring-2 focus:ring-saloom-500"
         />
       </div>
 
-      {/* Secção de Recomendados */}
-      <div>
-        <div className="flex items-center gap-2 mb-6">
-          <Sparkles className="text-amber-500" size={20} />
-          <h2 className="text-xl font-bold text-slate-900 dark:text-white">Os mais procurados no seu bairro</h2>
-        </div>
-
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {recomendados.map((salon) => (
-            <div 
-              key={salon.id}
-              className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl p-5 shadow-sm hover:shadow-md hover:border-saloom-100 dark:hover:border-saloom-900/30 transition-all flex flex-col justify-between"
-            >
-              <div>
-                <div className="flex items-center justify-between mb-3">
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-saloom-50 dark:bg-saloom-900/20 text-saloom-600 dark:text-saloom-400 capitalize">
-                    {salon.salon_type}
-                  </span>
-                  <Scissors size={16} className="text-slate-400" />
-                </div>
-                
-                <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-1 group-hover:text-saloom-500">
-                  {salon.salon_name}
-                </h3>
-                
-                <div className="flex items-center gap-1.5 text-sm text-slate-500 dark:text-slate-400 mb-2">
-                  <User size={14} />
-                  <span>Dono: {salon.owner_name}</span>
-                </div>
-                
-                <div className="flex items-start gap-1.5 text-sm text-slate-500 dark:text-slate-400">
-                  <MapPin size={14} className="mt-0.5 shrink-0 text-saloom-500" />
-                  <span className="line-clamp-2">{salon.location}</span>
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        {salons.map((salon) => (
+          <div
+            key={salon.id}
+            className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-lg flex flex-col justify-between"
+          >
+            {bookingId === salon.id ? (
+              <div className="space-y-3">
+                <input
+                  placeholder="Teu Nome"
+                  className="w-full p-2 bg-slate-800 text-white rounded border border-slate-700"
+                  onChange={(e) => setClientName(e.target.value)}
+                />
+                <input
+                  placeholder="Serviço (ex: Corte)"
+                  className="w-full p-2 bg-slate-800 text-white rounded border border-slate-700"
+                  onChange={(e) => setServiceType(e.target.value)}
+                />
+                <div className="flex gap-2">
+                  <button
+                    onClick={confirmBooking}
+                    className="flex-1 bg-saloom-500 text-white py-2 rounded-xl font-bold"
+                  >
+                    OK
+                  </button>
+                  <button
+                    onClick={() => setBookingId(null)}
+                    className="flex-1 bg-slate-700 text-white py-2 rounded-xl"
+                  >
+                    Cancelar
+                  </button>
                 </div>
               </div>
+            ) : (
+              <div>
+                <span className="text-saloom-500 text-xs font-bold uppercase tracking-wider">
+                  Corte
+                </span>
+                <h3 className="text-xl font-bold text-white mt-1 mb-3">
+                  {salon.salon_name}
+                </h3>
+                <p className="text-sm text-slate-400 flex items-center gap-2 mb-1">
+                  <User size={14} /> Dono: {salon.owner_name}
+                </p>
+                <p className="text-sm text-slate-400 flex items-center gap-2 mb-6">
+                  <MapPin size={14} /> {salon.location}
+                </p>
 
-              <button className="mt-6 w-full py-2.5 px-4 bg-slate-900 dark:bg-slate-800 hover:bg-saloom-500 dark:hover:bg-saloom-500 text-white font-medium rounded-xl transition-colors cursor-pointer text-sm">
-                Marcar Bicha
-              </button>
-            </div>
-          ))}
-        </div>
+                <div className="space-y-2">
+                  <button
+                    onClick={() => setBookingId(salon.id)}
+                    className="w-full py-2.5 bg-slate-800 hover:bg-saloom-600 text-white font-bold rounded-xl transition-colors"
+                  >
+                    Marcar Bicha
+                  </button>
+                  <button
+                    onClick={() => fetchQueue(salon.id)}
+                    className="w-full py-2 bg-slate-950 border border-slate-700 text-slate-400 text-sm rounded-xl"
+                  >
+                    Ver Fila do Dia
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
       </div>
+
+      {viewingQueue && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
+          <div className="bg-slate-900 border border-slate-700 p-6 rounded-2xl max-w-sm w-full">
+            <h2 className="text-xl font-bold text-white mb-4">
+              Estimativa: {queueList.length * 20} min
+            </h2>
+            <ul className="space-y-2 mb-6 max-h-60 overflow-y-auto">
+              {queueList.map((item, i) => (
+                <li
+                  key={item.id}
+                  className="text-slate-200 border-b border-slate-800 pb-2"
+                >
+                  {i + 1}. {item.client_name}
+                </li>
+              ))}
+            </ul>
+            <button
+              onClick={() => setViewingQueue(null)}
+              className="w-full py-2 bg-saloom-500 text-white rounded-xl"
+            >
+              Fechar
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

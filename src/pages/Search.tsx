@@ -1,11 +1,5 @@
 import { useState, useEffect } from "react";
-import {
-  Search as SearchIcon,
-  MapPin,
-  User,
-  Sparkles,
-  ArrowLeft,
-} from "lucide-react";
+import { Search as SearchIcon, MapPin, User, ArrowLeft } from "lucide-react";
 import { supabase } from "../supabaseClient";
 
 interface SearchProps {
@@ -36,54 +30,52 @@ export function Search({ onBack }: SearchProps) {
     setLoading(false);
   };
 
+  // Tenta isto temporariamente para validar:
   const fetchQueue = async (salonId: string) => {
-    const today = new Date().toISOString().split("T")[0];
-    const { data } = await supabase
-      .from("queue")
+    const { data, error } = await supabase
+      .from("bookings") // Garante que usas a mesma tabela 'bookings'
       .select("*")
       .eq("salon_id", salonId)
-      .gte("created_at", `${today}T00:00:00`);
+      // .gte("created_at", ...) // COMENTA ESTA LINHA E VÊ SE APARECE
+      .order("created_at", { ascending: true });
 
+    console.log("Dados recebidos:", data); // Abre o console (F12) e vê se os nomes estão aqui
     setQueueList(data || []);
     setViewingQueue(salonId);
   };
-
   useEffect(() => {
     const delayDebounceFn = setTimeout(() => fetchSalons(searchQuery), 300);
     return () => clearTimeout(delayDebounceFn);
   }, [searchQuery]);
 
   const confirmBooking = async () => {
-    // Validação básica
     if (!clientName || !serviceType || !bookingId) {
       alert("Por favor, preencha o nome e o serviço.");
       return;
     }
 
-    // AQUI É O CÓDIGO QUE PRECISAS
-    // Estamos a preparar o objeto exatamente como a tua tabela 'queue' espera:
     const newBooking = {
       salon_id: bookingId,
-      client_name: clientName,
+      customer_name: clientName,
       service_type: serviceType,
       status: "waiting",
-      // O 'created_at' o Supabase trata automaticamente se definiste na tabela
     };
 
-    // Agora enviamos para a base de dados
-    const { error } = await supabase.from("queue").insert([newBooking]);
+    // Altera de "queue" para "bookings"
+    const { error } = await supabase.from("bookings").insert([newBooking]);
 
     if (error) {
       console.error("Erro Supabase:", error);
       alert("Erro ao marcar bicha: " + error.message);
     } else {
       alert("Bicha marcada com sucesso!");
+      fetchQueue(bookingId); // Abre a fila automaticamente após marcar
       setBookingId(null);
       setClientName("");
       setServiceType("");
     }
   };
-  
+
   return (
     <div className="max-w-4xl mx-auto px-4 py-8 animate-fade-in">
       <button
@@ -185,18 +177,30 @@ export function Search({ onBack }: SearchProps) {
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
           <div className="bg-slate-900 border border-slate-700 p-6 rounded-2xl max-w-sm w-full">
             <h2 className="text-xl font-bold text-white mb-4">
-              Estimativa: {queueList.length * 20} min
+              Estimativa:{" "}
+              {queueList.reduce((acc, item) => {
+                const tempo =
+                  parseInt(
+                    String(item.estimated_time || 0).replace(/\D/g, ""),
+                    10,
+                  ) || 0;
+                return acc + tempo;
+              }, 0)}{" "}
+              min
             </h2>
+
             <ul className="space-y-2 mb-6 max-h-60 overflow-y-auto">
               {queueList.map((item, i) => (
                 <li
                   key={item.id}
                   className="text-slate-200 border-b border-slate-800 pb-2"
                 >
-                  {i + 1}. {item.client_name}
+                  {i + 1}.{" "}
+                  {item.customer_name || item.customer_name || "Sem nome"}
                 </li>
               ))}
             </ul>
+
             <button
               onClick={() => setViewingQueue(null)}
               className="w-full py-2 bg-saloom-500 text-white rounded-xl"

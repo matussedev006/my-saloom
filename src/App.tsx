@@ -3,37 +3,31 @@ import { Search } from "./pages/Search";
 import { Auth } from "./pages/Auth";
 import { Dashboard } from "./pages/Dashboard";
 import { Scissors, Sun, Moon } from "lucide-react";
+import { supabase } from "./supabaseClient";
 
 export default function App() {
-  // Estados de navegação e controlo de sessão
-  const [view, setView] = useState<
-    "landing" | "search" | "login" | "register" | "dashboard"
-  >("landing");
+  const [view, setView] = useState<"landing" | "search" | "login" | "register" | "dashboard">("landing");
   const [userSalonId, setUserSalonId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
   const [darkMode, setDarkMode] = useState(() => {
     if (typeof window !== "undefined") {
-      return (
-        localStorage.getItem("theme") === "dark" ||
-        (!("theme" in localStorage) &&
-          window.matchMedia("(prefers-color-scheme: dark)").matches)
-      );
+      return localStorage.getItem("theme") === "dark" || 
+             (!("theme" in localStorage) && window.matchMedia("(prefers-color-scheme: dark)").matches);
     }
     return false;
   });
 
-  // Função disparada quando o Login ou Registo corre com sucesso
   function handleAuthSuccess(id: string) {
     setUserSalonId(id);
-    setView("dashboard"); // Redireciona direto para o painel em tempo real!
+    setView("dashboard");
   }
 
-  // Função para fazer logout e limpar a sessão local
   function handleLogout() {
+    supabase.auth.signOut();
     setUserSalonId(null);
     setView("landing");
   }
 
-  // Atualiza a classe HTML para o funcionamento do Tailwind v4
   useEffect(() => {
     if (darkMode) {
       document.documentElement.classList.add("dark");
@@ -44,12 +38,36 @@ export default function App() {
     }
   }, [darkMode]);
 
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        setUserSalonId(session.user.id);
+        setView("dashboard");
+      }
+      setLoading(false);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) {
+        setUserSalonId(session.user.id);
+        setView("dashboard");
+      } else {
+        setUserSalonId(null);
+        setView("landing");
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  if (loading) {
+    return <div className="flex h-screen items-center justify-center bg-slate-950 text-white">Carregando...</div>;
+  }
+
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-50 transition-colors duration-200">
-      {/* NAVBAR PRINCIPAL (Oculta botões de autenticação desnecessários se estiver no Dashboard) */}
       <header className="sticky top-0 z-40 w-full border-b border-slate-200/80 dark:border-slate-800/80 bg-slate-50/80 dark:bg-slate-950/80 backdrop-blur-md">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          {/* Logo */}
           <div
             onClick={() => setView(userSalonId ? "dashboard" : "landing")}
             className="flex items-center gap-2 cursor-pointer font-black text-2xl tracking-wider text-slate-900 dark:text-white"
@@ -62,7 +80,6 @@ export default function App() {
             </span>
           </div>
 
-          {/* Ações Laterais */}
           <div className="flex items-center gap-4">
             <button
               onClick={() => setDarkMode(!darkMode)}
@@ -75,7 +92,6 @@ export default function App() {
               )}
             </button>
 
-            {/* Só mostra botões de login se o utilizador não estiver autenticado e estiver na landing */}
             {view === "landing" && !userSalonId && (
               <div className="hidden sm:flex items-center gap-3">
                 <button
@@ -96,7 +112,6 @@ export default function App() {
         </div>
       </header>
 
-      {/* ROTEAMENTO DINÂMICO DE VISÕES */}
       <main className="flex-1">
         {view === "search" ? (
           <Search
@@ -110,7 +125,6 @@ export default function App() {
         ) : view === "dashboard" && userSalonId ? (
           <Dashboard salonId={userSalonId} onLogout={handleLogout} />
         ) : (
-          /* LANDING PAGE - APRESENTAÇÃO DO PRODUTO */
           <div className="animate-fade-in">
             <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-16 pb-20 text-center lg:pt-24">
               <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-saloom-100 dark:bg-saloom-900/30 text-saloom-600 dark:text-saloom-400 mb-4 tracking-wide uppercase">
@@ -143,8 +157,6 @@ export default function App() {
                 </button>
               </div>
             </section>
-
-            {/* Secção de Prova de Valor encurtada para manter legível */}
             <section className="py-12 bg-slate-100/50 dark:bg-slate-900/30 border-y border-slate-200/60 dark:border-slate-800/20 text-center text-sm text-slate-500">
               Diga adeus às filas desorganizadas no seu estabelecimento. Teste
               agora o MY SALOOM.
@@ -153,14 +165,12 @@ export default function App() {
         )}
       </main>
 
-      {/* FOOTER DINÂMICO (Ocultado quando o proprietário está no Dashboard para economizar espaço de ecrã) */}
       {view !== "dashboard" && (
         <footer className="w-full border-t border-slate-200 dark:border-slate-900 bg-white dark:bg-slate-950 py-12">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
             <p className="text-md font-bold text-slate-800 dark:text-slate-300 mb-6">
               Tenha o controle dos seus clientes na palma da sua mão.
             </p>
-
             <div className="flex items-center justify-center gap-6 text-sm mb-8">
               <button
                 onClick={() => setView("login")}
@@ -176,7 +186,6 @@ export default function App() {
                 Criar Nova Conta de Salão
               </button>
             </div>
-
             <div className="text-xs text-slate-400 dark:text-slate-600">
               &copy; {new Date().getFullYear()} MY SALOOM. Desenvolvido por
               Corporation Mathusse. Todos os direitos reservados.
